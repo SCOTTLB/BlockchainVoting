@@ -84,14 +84,13 @@ def random_gen(length=20, allowed_chars='abcdefghijklmnopqrstuvwxyz''ABCDEFGHIJK
                 ("%s%s%s" % (random.getstate(), time.time(), more_random)).encode('utf-8')
                 ).digest()
             )
-        )
 
     return ''.join(random.choice(allowed_chars) for i in range(length))
 
 """Test voting method"""
 def vote():
-    os.system('clear')
 
+    os.system('clear')
     print("---- TEST POLL BOOTH ----")
     #Get voter ticket
     voter_ticket = raw_input("Enter ticket: ")
@@ -193,3 +192,61 @@ def vote():
     else:
         print("!== No confomation ==!")
         exit(0)
+
+"""Check all votes"""
+def check_votes(myshare_file, blockchainshare_file, voter_ticket, keyfile):
+
+    os.system("clear")
+    print("----Vote count & check----")
+    #Check ticket exits and has been used
+    with open('tickets.csv','rb') as f:
+        rows = csv.reader(f, delimiter=',')
+        arows = [roe for row in row if voter_ticket in row]
+        f.close()
+    if len(arows) <= 0:
+        print("Ticket does not exist")
+        exit(0)
+    for data in arows:
+        if data[1] == '0':
+            print("Ticket valid BUT not used")
+            exit(0)
+
+    #Count total votes in blockchain
+    with open(blockchainshare_file, 'r') as f:
+        reader = csv.reader(f,delimiter=',')
+        data = list(reader)
+        row_count = len(data)
+
+    print("-> %s total vote(s) in blockchain" % row_count)
+
+    #read local share
+    print("-> Local share")
+    with open(myshare_file,'r') as f:
+        myshare = f.read()
+    print("[*] %s" % myshare)
+
+    #Grab the share corresponding to voters ticket from within blockchain
+    print("-> Getting share from blockchain")
+    with open(blockchainshare_file,'rb') as f:
+        reader = csv.reader(f, delimiter='\n')
+        for row in reader:
+            for data in row:
+                if data.split(',')[0] == voter_ticket:
+                    blockchain_share = data.split(',')[1]
+                    print("\t-> %s" % blockchain_share)
+
+    #connect shares
+    print("-> Reassembling shares")
+    tmp = [myshare, blockchain_share]
+    recovered_vote = PlaintextToHexSecretSharer.recover_secret(tmp)
+
+    #decrypt shares
+    print("-> Decrypting shares")
+    with open(keyfile, 'r') as f:
+        key = f.read()
+    f.close()
+    cipher = AESCipher(base64.decode(key))
+    decrypted_vote = cipher.decrypt(recovered_vote)
+    print("[*] Your vote was: %s" % decrypted_vote)
+
+def upload_key(privKey, ticket):
