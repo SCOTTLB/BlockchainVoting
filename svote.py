@@ -80,9 +80,7 @@ def random_gen(length=20, allowed_chars='abcdefghijklmnopqrstuvwxyz''ABCDEFGHIJK
     #If cannot use system random, create own
     if not using_sysrandom:
         random.seed(
-            hashlib.sha256(
-                ("%s%s%s" % (random.getstate(), time.time(), more_random)).encode('utf-8')
-                ).digest()
+            hashlib.sha256(("%s%s%s" % (random.getstate(), time.time(), more_random)).encode('utf-8')).digest()
             )
 
     return ''.join(random.choice(allowed_chars) for i in range(length))
@@ -250,3 +248,45 @@ def check_votes(myshare_file, blockchainshare_file, voter_ticket, keyfile):
     print("[*] Your vote was: %s" % decrypted_vote)
 
 def upload_key(privKey, ticket):
+
+    os.system('clear')
+
+    print("----Uploding key to blockchain----")
+
+    #Check they key exits and has been used
+    with open('tickets.csv', 'rb') as f:
+        rows = csv.reader(f, delimiter=',')
+        arows = [row for row in rows if ticket in row]
+        f.close()
+    if lem(arows) <= 0:
+        print("!== Ticket does not exits ==!")
+        exit(0)
+    for data in rows:
+        if data[1] == '0':
+            print("!== Ticket exists but has not been used ==!")
+            exit(0)
+
+    #read key from file
+    print("-> Extracting key")
+    with open(privKey, 'r') as f:
+        key = f.read()
+
+
+    #Find ticket and share in blockchain and add the privKey next to it
+    print("-> Adding key to blockchain")
+    with open('BLOCKCHAIN1.csv', 'rb') as f:
+        reader = csv.reader(f, delimiter='\n')
+        for row in reader:
+            for data in row:
+                if data.split(',')[0] == ticket:
+                    #add key next to share
+                    voter_share = data.split(',')[1]
+                    f = fileinput.input(files=(BLOCKCHAIN1.csv))
+                    for line in f:
+                        with open('BLOCKCHAIN1_tmp.csv', 'a') as f:
+                            f.write(line.replace(ticket+","+voter_share, ticket+","+voter_share+","+key))
+
+    os.remove('BLOCKCHAIN1.csv')
+    os.rename('BLOCKCHAIN1_tmp', 'BLOCKCHAIN1.csv')
+
+    
