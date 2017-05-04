@@ -33,7 +33,8 @@ def create_tickets(roll_data):
         voter_rnd = ''.join(voters).replace(" ", "") + random_gen()
 
         #Gen a hash of the above voter_rnd and add a field to check if the tickets been used
-        new_ticket = bcrypt.hashpw(voter_rnd, bcrypt.gensalt())
+        #Have to encode in b64 as the has includes '$' and bash treats them as vars
+        new_ticket = base64.b64encode(bcrypt.hashpw(voter_rnd, bcrypt.gensalt()))
         print("-> %s" % new_ticket)
         tmp = []
         tmp.append(new_ticket)
@@ -90,7 +91,7 @@ def vote():
 
     #Check ticket is legit
     with open('tickets.csv', 'rb') as database:
-        rows = csv.reader(datatbase, delimiter=',')
+        rows = csv.reader(database, delimiter=',')
         arows = [row for row in rows if voter_ticket in row]
         database.close()
     if len(arows) <= 0:
@@ -99,7 +100,7 @@ def vote():
 
     #Check the blockchain to make sure the ticket hasnt been used
     with open('BLOCKCHAIN1.CSV', 'rb') as bc:
-        reader = csv.reader(bc, dialect='\n')
+        reader = csv.reader(bc, delimiter='\n')
         for row in reader:
             for data in row:
                 if data.split(',')[0] == voter_ticket:
@@ -108,7 +109,7 @@ def vote():
 
     #Dispkay polling options
     print("Select your option")
-    choice = raw_input("A. ABC\nB. DEF\nC. GHI")
+    choice = raw_input("A. ABC\nB. DEF\nC. GHI\n")
 
     if choice == 'A' or choice == 'a':
         voter_choice = 'ABC'
@@ -121,8 +122,8 @@ def vote():
         exit(0)
 
     #Display conformation
-    print("\n[*] Your Ticket:\t%s\n[*] Your vote:\t%s\n" % voter_ticket, voter_choice)
-    confirm = raw_input("Confirm? y/n")
+    print("\n[*] Your Ticket:%s\n[*] Your vote:\t%s\n" % (voter_ticket, voter_choice))
+    confirm = raw_input("Confirm? y/n\n")
     if confirm == 'y' or confirm == 'Y':
         print ""
 
@@ -135,7 +136,7 @@ def vote():
 
         #Save encryption key
         f = open("privKey.txt", "w")
-        f.write(base64.encode(random_key))
+        f.write(base64.b64encode(random_key))
         f.close()
         print("-> Key saved locally as privKey.txt")
 
@@ -180,8 +181,9 @@ def vote():
         #Print receipt
         print("\n\n==========POLL RECEIPT==========\n")
         print("[*] Your share: %s" % secretshares[2])
-        print("[*] Your key: %s" % base64.encode(random_key))
+        print("[*] Your key: %s" % base64.b64encode(random_key))
         print("[*] Your ticket: %s" % voter_ticket)
+        print("\n================================")
     else:
         print("!== No confomation ==!")
         exit(0)
@@ -194,7 +196,11 @@ def check_votes(myshare_file, blockchainshare_file, voter_ticket, keyfile):
     #Check ticket exits and has been used
     with open('tickets.csv','rb') as f:
         rows = csv.reader(f, delimiter=',')
-        arows = [roe for row in row if voter_ticket in row]
+        arows = []
+        for x in rows:
+            if voter_ticket in x:
+                arows.append(x)
+        #arows = [row for row in rows if voter_ticket in row]
         f.close()
     if len(arows) <= 0:
         print("Ticket does not exist")
@@ -238,7 +244,7 @@ def check_votes(myshare_file, blockchainshare_file, voter_ticket, keyfile):
     with open(keyfile, 'r') as f:
         key = f.read()
     f.close()
-    cipher = AESCipher(base64.decode(key))
+    cipher = AESCipher(base64.b64decode(key))
     decrypted_vote = cipher.decrypt(recovered_vote)
     print("[*] Your vote was: %s" % decrypted_vote)
 
@@ -254,10 +260,10 @@ def upload_key(privKey, ticket):
         rows = csv.reader(f, delimiter=',')
         arows = [row for row in rows if ticket in row]
         f.close()
-    if lem(arows) <= 0:
+    if len(arows) <= 0:
         print("!== Ticket does not exits ==!")
         exit(0)
-    for data in rows:
+    for data in arows:
         if data[1] == '0':
             print("!== Ticket exists but has not been used ==!")
             exit(0)
@@ -277,13 +283,13 @@ def upload_key(privKey, ticket):
                 if data.split(',')[0] == ticket:
                     #add key next to share
                     voter_share = data.split(',')[1]
-                    f = fileinput.input(files=(BLOCKCHAIN1.csv))
+                    f = fileinput.input(files=('BLOCKCHAIN1.csv'))
                     for line in f:
                         with open('BLOCKCHAIN1_tmp.csv', 'a') as f:
                             f.write(line.replace(ticket+","+voter_share, ticket+","+voter_share+","+key))
 
     os.remove('BLOCKCHAIN1.csv')
-    os.rename('BLOCKCHAIN1_tmp', 'BLOCKCHAIN1.csv')
+    os.rename('BLOCKCHAIN1_tmp.csv', 'BLOCKCHAIN1.csv')
 
 
 """Test case"""
@@ -307,12 +313,12 @@ def dry_run():
                                 gov_share = datag.split(',')[1]
                                 voter_key = data.split(',')[2]
                                 print("-> Ticket: %s" % current_ticket)
-                                print("\tKey: %s" %voter_key)
-                                print("\n\tShares:\n\t\tBlockchain: %s\n\t\tGov: %s" % bs_share, gov_share)
+                                print("\tKey: %s" % voter_key)
+                                print("\n\tShares:\n\t\tBlockchain: %s\n\t\tGov: %s" % (bs_share, gov_share))
 
                                 tmp = [bs_share, gov_share]
                                 recovered_vote = PlaintextToHexSecretSharer.recover_secret(tmp)
-                                cipher = AESCipher(base64.decode(voter_key))
+                                cipher = AESCipher(base64.b64decode(voter_key))
                                 decrypted_vote = cipher.decrypt(recovered_vote)
                                 print("\tDecrypted Vote: %s" % decrypted_vote)
                                 final_votes.append(decrypted_vote)
@@ -338,10 +344,10 @@ class AESCipher:
         raw = pad(raw)
         iv = Random.new().read(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        return base64.encode(iv + cipher.encrypt(raw))
+        return base64.b64encode(iv + cipher.encrypt(raw))
 
     def decrypt(self, encoded):
-        enc = base64.decode(encoded)
+        enc = base64.b64decode(encoded)
         iv = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         return unpad(cipher.decrypt(enc[16:]))
@@ -361,8 +367,7 @@ def main(arguments):
 
     args = parser.parse_args(arguments)
 
-    #Initialise files needed
-
+    """Initialise files needed"""
     #gen a fake electoral roll list
     if not os.path.exists('electoral_roll.csv'):
         f = open('electoral_roll.csv', 'w')
@@ -373,22 +378,25 @@ def main(arguments):
         f.write('bill,buchanan,EE018120F,05/05/2005,"5 street street Edinburgh, UK"\n')
         f.close()
 
-        if not os.path.exists('BLOCKCHAIN1.csv'):
-            open('BLOCKCHAIN1.csv','w').close()
+    if not os.path.exists('BLOCKCHAIN1.csv'):
+        open('BLOCKCHAIN1.csv','w').close()
 
-        if not os.path.exists('gov.csv'):
-            open('gov.csv','w').close()
+    if not os.path.exists('gov.csv'):
+        open('gov.csv','w').close()
 
-        if args.roll:
-            tickets_create(args.roll)
-        elif args.pshare:
-            if args.bshare:
-                check_votes(args.pshare, args.beshare, args.ticket, args.key)
-        elif args.upload:
-            upload_key(args.upload, args.ticket)
-        elif args.count:
-            dry_run()
-        else:
-            vote()
+    #Arg handling
+    if args.roll:
+        print("Running ticket create")
+        create_tickets(args.roll)
+    elif args.pshare:
+        if args.bshare:
+            check_votes(args.pshare, args.bshare, args.ticket, args.key)
+    elif args.upload:
+        upload_key(args.upload, args.ticket)
+    elif args.count:
+        dry_run()
+    else:
+        vote()
+
 if __name__ == '__main__':
-    sys.exit(main(sys.argv[1:]))
+    main(sys.argv[1:])
