@@ -247,6 +247,7 @@ def check_votes(myshare_file, blockchainshare_file, voter_ticket, keyfile):
     decrypted_vote = cipher.decrypt(recovered_vote)
     print("[*] Your vote was: %s" % decrypted_vote)
 
+"""Upload keys to blockchain"""
 def upload_key(privKey, ticket):
 
     os.system('clear')
@@ -289,4 +290,58 @@ def upload_key(privKey, ticket):
     os.remove('BLOCKCHAIN1.csv')
     os.rename('BLOCKCHAIN1_tmp', 'BLOCKCHAIN1.csv')
 
-    
+
+"""Test case"""
+def dry_run():
+    final_votes = []
+    os.system("clear")
+    print("----Counting Votes (gov)----")
+
+    with open("BLOCKCHAIN1.csv", 'rb') as f:
+        reader = csv.reader(f, delimiter='\n')
+        for row in reader:
+            for data in row:
+                current_ticket = data.split(',')[0]
+                with open('gov.csv') as g:
+                    readerg = csv.reader(g, delimiter='\n')
+                    for rowg in readerg:
+                        for datag in rowg:
+                            gov_ticket = data.split(',')[0]
+                            if current_ticket == gov_ticket:
+                                bs_share = data.split(',')[1]
+                                gov_share = datag.split(',')[1]
+                                voter_key = data.split(',')[2]
+                                print("-> Ticket: %s" % current_ticket)
+                                print("\tKey: %s" %voter_key)
+                                print("\n\tShares:\n\t\tBlockchain: %s\n\t\tGov: %s" % bs_share, gov_share)
+
+                                tmp = [bs_share, gov_share]
+                                recovered_vote = PlaintextToHexSecretSharer.recover_secret(tmp)
+                                cipher = AESCipher(base64.decode(voter_key))
+                                decrypted_vote = cipher.decrypt(recovered_vote)
+                                print("\tDecrypted Vote: %s" % decrypted_vote)
+                                final_votes.append(decrypted_vote)
+
+    print("\n-> Final vote counting")
+    counts = Counter(final_votes)
+    for key, value in counts.iteritems():
+        print("%s votes for |%s|" % (value, key))
+
+
+"""AES256 Encryption class"""
+class AESCipher:
+
+    def __init__(self, key):
+        self.key = key
+
+    def encrypt(self, raw):
+        raw = pad(raw)
+        iv = Random.new().read(AES.block_size)
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        return base64.encode(iv + cipher.encrypt(raw))
+
+    def decrypt(self, encoded):
+        enc = base64.decode(encoded)
+        iv = enc[:16]
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        return unpad(cipher.decrypt(enc[16:]))
