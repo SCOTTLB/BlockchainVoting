@@ -60,3 +60,7 @@ target/
 *.pdf
 
 \.DS_Store
+
+*.csv
+
+*.txt
