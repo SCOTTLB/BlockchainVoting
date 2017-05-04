@@ -17,11 +17,6 @@ from secretsharing import PlaintextToHexSecretSharer
 __author__ = "S. Bean, Peter Aaby, Charley Celice, Sean McKeown"
 __version__ = "0.5"
 
-#Pad AES encyption
-BS = 16
-pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
-unpad = lambda s : s[0:-ord(s[-1])]
-
 
 """ Gen tickets based on electoral roll """
 def create_tickets(roll_data):
@@ -328,6 +323,11 @@ def dry_run():
         print("%s votes for |%s|" % (value, key))
 
 
+#Pad AES encyption
+BS = 16
+pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
+unpad = lambda s : s[0:-ord(s[-1])]
+
 """AES256 Encryption class"""
 class AESCipher:
 
@@ -345,3 +345,50 @@ class AESCipher:
         iv = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         return unpad(cipher.decrypt(enc[16:]))
+
+"""Main to deal with args"""
+def main(arguments):
+
+    #Deal wth args passed to the script
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-g', '--roll', help="Generate tickets from electoral roll file")
+    parser.add_argument('-ps', '--pshare', help="Personal share file(Vote checking)")
+    parser.add_argument('-bs', '--bshare', help="BLOCKCHAIN1 share file(vote checking)")
+    parser.add_argument('-t', '--ticket', help="Ticket(vote checking)")
+    parser.add_argument('-k', '--key', help="Encryption key file(vote checking)")
+    parser.add_argument('-u', '--upload', help="Upload key to BLOCKCHAIN1")
+    parser.add_argument('-c', '--count',action='store_true' ,help="Count votes from Govs point of view")
+
+    args = parser.parse_args(arguments)
+
+    #Initialise files needed
+
+    #gen a fake electoral roll list
+    if not os.path.exists('electoral_roll.csv'):
+        f = open('electoral_roll.csv', 'w')
+        f.write('peter,aaby,AA011520B,01/01/2000,"1 street street Edinburgh, UK"\n')
+        f.write('scott,bean,BB568394C,02/02/2001,"2 street street Edinburgh, UK"\n')
+        f.write('john,smith,CC739546D,03/03/2003,"3 street street Edinburgh, UK"\n')
+        f.write('michal,nash,DD899023E,04/04/2004,"4 street street Edinburgh, UK"\n')
+        f.write('bill,buchanan,EE018120F,05/05/2005,"5 street street Edinburgh, UK"\n')
+        f.close()
+
+        if not os.path.exists('BLOCKCHAIN1.csv'):
+            open('BLOCKCHAIN1.csv','w').close()
+
+        if not os.path.exists('gov.csv'):
+            open('gov.csv','w').close()
+
+        if args.roll:
+            tickets_create(args.roll)
+        elif args.pshare:
+            if args.bshare:
+                check_votes(args.pshare, args.beshare, args.ticket, args.key)
+        elif args.upload:
+            upload_key(args.upload, args.ticket)
+        elif args.count:
+            dry_run()
+        else:
+            vote()
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
