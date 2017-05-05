@@ -7,12 +7,13 @@ TODO:
 * Implement blockchain
 """
 #Imports
-import argparse, base64, bcrypt, csv, fileinput, os, random, sys, django.utils.crypto
+import argparse, base64, bcrypt, csv, fileinput, os, random, sys, django.utils.crypto, time
 from collections import Counter
 from Crypto.Cipher import AES
 from Crypto import Random
 from string import ascii_uppercase
 from secretsharing import PlaintextToHexSecretSharer
+from fpdf import FPDF
 
 __author__ = "S. Bean, Peter Aaby, Charley Celice, Sean McKeown"
 __version__ = "0.5"
@@ -352,6 +353,26 @@ class AESCipher:
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         return unpad(cipher.decrypt(enc[16:]))
 
+"""PDF Receipt gen"""
+def receipt_gen():
+    #Setup page
+    receipt = FPDF('P', 'mm', (100,400))
+    receipt.add_page()
+
+    #Header
+    receipt.set_font('Arial', '', 26)
+    receipt.cell(0,11, 'Poll Receipt', ln=2, align='C')
+
+    #Print date time
+    receipt.set_font('Arial', '', 10)
+    receipt.cell(0,5, time.strftime("%d/%m/%Y"), align='C', ln=2)
+    receipt.cell(0,10, time.strftime("%H:%M:%S"), align='C', ln=2, border='B')
+
+    #Body
+    receipt.set_font('Arial', '', 22 )
+    receipt.cell(0,20, 'Your Share', align='C')
+    receipt.output('Poll Receipt.pdf')
+
 """Main to deal with args"""
 def main(arguments):
 
@@ -399,4 +420,5 @@ def main(arguments):
         vote()
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    #main(sys.argv[1:])
+    receipt_gen()
