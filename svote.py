@@ -7,7 +7,8 @@ TODO:
 * Implement blockchain
 """
 #Imports
-import argparse, base64, bcrypt, csv, fileinput, os, random, sys, django.utils.crypto, time
+import argparse, base64, hashlib, csv, fileinput, os, random, sys, django.utils.crypto, time, qrcode
+from bcrypt import gensalt
 from collections import Counter
 from Crypto.Cipher import AES
 from Crypto import Random
@@ -35,7 +36,7 @@ def create_tickets(roll_data):
 
         #Gen a hash of the above voter_rnd and add a field to check if the tickets been used
         #Have to encode in b64 as the has includes '$' and bash treats them as vars
-        new_ticket = base64.b64encode(bcrypt.hashpw(voter_rnd, bcrypt.gensalt()))
+        new_ticket = hashlib.sha256(voter_rnd + gensalt()).hexdigest()
         print("-> %s" % new_ticket)
         tmp = []
         tmp.append(new_ticket)
@@ -46,7 +47,7 @@ def create_tickets(roll_data):
             wr = csv.writer(ticktsf, lineterminator='\n')
             wr.writerow(tmp)
 
-        shuffle()
+    shuffle()
 
 """Shuffle lines in a file"""
 def shuffle():
@@ -179,6 +180,7 @@ def vote():
         os.remove('tickets.csv')
         os.rename("tickets_tmp.csv", "tickets.csv")
 
+        receipt_gen(secretshares[2], base64.b64encode(random_key), voter_ticket)
         #Print receipt
         print("\n\n==========POLL RECEIPT==========\n")
         print("[*] Your share: %s" % secretshares[2])
@@ -353,11 +355,30 @@ class AESCipher:
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         return unpad(cipher.decrypt(enc[16:]))
 
+"""QR Code gen"""
+def qr_gen(share, key, ticket):
+
+    #Generate qr codes for the receipt
+    qr_share = qrcode.make(share)
+    qr_key = qrcode.make(key)
+    qr_ticket = qrcode.make(ticket)
+
+    qr_share.save('share.png')
+    qr_key.save('key.png')
+    qr_ticket.save('ticket.png')
+
 """PDF Receipt gen"""
-def receipt_gen():
+def receipt_gen(share, key, ticket):
+
+    ipsum = """ Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. """
+
+
+    qr_gen(share, key, ticket)
     #Setup page
-    receipt = FPDF('P', 'mm', (100,400))
+    receipt = FPDF('P', 'mm', (100,350))
     receipt.add_page()
+    dynamic_widith = receipt.w - 2*receipt.l_margin
+
 
     #Header
     receipt.set_font('Arial', '', 26)
@@ -367,10 +388,30 @@ def receipt_gen():
     receipt.set_font('Arial', '', 10)
     receipt.cell(0,5, time.strftime("%d/%m/%Y"), align='C', ln=2)
     receipt.cell(0,10, time.strftime("%H:%M:%S"), align='C', ln=2, border='B')
+    #spacer
+    receipt.cell(0,5,ln=2)
 
     #Body
     receipt.set_font('Arial', '', 22 )
-    receipt.cell(0,20, 'Your Share', align='C')
+
+    #Personal Share
+    receipt.cell(0,10, 'Your Share', align='C', ln=1)
+    receipt.image('share.png',w=50,x=25)
+    #Private key
+    receipt.cell(0,10, 'Your Private Key', align='C', ln=1)
+    receipt.image('key.png',w=50,x=25)
+    #Personal Share
+    receipt.cell(0,10, 'Your ticket', align='C', ln=1)
+    receipt.image('ticket.png',w=50,x=25)
+
+    #Spacer
+    receipt.cell(0,5,ln=1,border='B')
+    receipt.cell(0,10, ln=1)
+
+    #Instructions
+    receipt.set_font('Arial', '', 12)
+    receipt.multi_cell(dynamic_widith, 4, ipsum, align='L')
+    #Save pdf
     receipt.output('Poll Receipt.pdf')
 
 """Main to deal with args"""
@@ -420,5 +461,5 @@ def main(arguments):
         vote()
 
 if __name__ == '__main__':
-    #main(sys.argv[1:])
-    receipt_gen()
+    main(sys.argv[1:])
+    #receipt_gen('123', '456', 'xyz')
