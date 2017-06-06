@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
+
 """
 TODO:
-* QR Code receipts (Line 188)
 * mySQL instead of using a csv for tickets?
 * Implement blockchain
 """
 #Imports
-import argparse, base64, hashlib, csv, fileinput, os, random, sys, django.utils.crypto, time, qrcode
+import argparse, base64, hashlib, csv, fileinput, os, random, sys, django.utils.crypto, time, qrcode, blockcypher
 from bcrypt import gensalt
 from collections import Counter
 from Crypto.Cipher import AES
@@ -15,10 +15,10 @@ from Crypto import Random
 from string import ascii_uppercase
 from secretsharing import PlaintextToHexSecretSharer
 from fpdf import FPDF
+from Tkinter import *
 
 __author__ = "S. Bean, Peter Aaby, Charley Celice, Sean McKeown"
 __version__ = "0.5"
-
 
 """ Gen tickets based on electoral roll """
 def create_tickets(roll_data):
@@ -35,7 +35,6 @@ def create_tickets(roll_data):
         voter_rnd = ''.join(voters).replace(" ", "") + random_gen()
 
         #Gen a hash of the above voter_rnd and add a field to check if the tickets been used
-        #Have to encode in b64 as the has includes '$' and bash treats them as vars
         new_ticket = hashlib.sha256(voter_rnd + gensalt()).hexdigest()
         print("-> %s" % new_ticket)
         tmp = []
@@ -331,6 +330,46 @@ def dry_run():
     for key, value in counts.iteritems():
         print("%s votes for |%s|" % (value, key))
 
+"""Build Gui"""
+def buildUI():
+    #calling this method starts the ui
+    root = Tk()
+    #passes it into main app
+    mainApp = MainWindow(root)
+    #enter the event mainloop
+    root.mainloop()
+
+"""GUI"""
+class MainWindow:
+    #this class handles the main window
+    def __init__(self, master):
+        self.master = master
+        self.master.geometry('{}x{}'.format(200,200))
+        def raise_frame(frame):
+            frame.tkraise()
+
+        #Build frames
+        self.frame1 = Frame(self.master)
+        self.frame2 = Frame(self.master)
+        self.frame3 = Frame(self.master)
+
+        #stack frames
+        for frame in(self.frame1, self.frame2, self.frame3):
+            frame.grid(row=0, column=0, sticky='news')
+
+        #frame1
+        Button(self.frame1, text="Goto F2", command=lambda:raise_frame(self.frame2)).pack()
+        Label(self.frame1, text="Frame1").pack()
+        #frame2
+        Button(self.frame2, text="Goto F3", command=lambda:raise_frame(self.frame3)).pack()
+        Label(self.frame2, text="Frame2").pack()
+        #frame3
+        Button(self.frame3, text="Goto F1", command=lambda:raise_frame(self.frame1)).pack()
+        Label(self.frame3, text="Frame3").pack()
+
+        #ensure 1 is ontop at beginning
+        raise_frame(self.frame1)
+
 
 #Pad AES encyption
 BS = 16
@@ -395,13 +434,13 @@ def receipt_gen(share, key, ticket):
     receipt.set_font('Arial', '', 22 )
 
     #Personal Share
-    receipt.cell(0,10, 'Your Share', align='C', ln=1)
+    receipt.cell(0,10, 'Share', align='C', ln=1)
     receipt.image('share.png',w=50,x=25)
     #Private key
-    receipt.cell(0,10, 'Your Private Key', align='C', ln=1)
+    receipt.cell(0,10, 'Private Key', align='C', ln=1)
     receipt.image('key.png',w=50,x=25)
     #Personal Share
-    receipt.cell(0,10, 'Your ticket', align='C', ln=1)
+    receipt.cell(0,10, 'Ticket', align='C', ln=1)
     receipt.image('ticket.png',w=50,x=25)
 
     #Spacer
@@ -461,5 +500,6 @@ def main(arguments):
         vote()
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    buildUI()
+    #main(sys.argv[1:])
     #receipt_gen('123', '456', 'xyz')
